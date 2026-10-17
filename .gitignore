@@ -1,0 +1,9 @@
+# Private Python copy downloaded by setup_python.bat
+python/
+
+# Python caches
+__pycache__/
+*.py[cod]
+
+# Excel lock files
+~$*.xlsx
