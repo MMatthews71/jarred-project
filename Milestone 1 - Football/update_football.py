@@ -16,9 +16,15 @@ Sources:
   * mcillecesports.com       - Control Rating (column S)
 """
 
+import os
 import re
 import sys
 from datetime import datetime
+
+# The embedded Python that setup_python.bat installs uses a ._pth file, which
+# stops Python from adding this script's own folder to the import path. Add it
+# back so the local config.py / common.py next to this file are found.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import config
 from common import (requests, TeamMatcher, open_sheet, sheet_rows, write_values,
@@ -26,7 +32,7 @@ from common import (requests, TeamMatcher, open_sheet, sheet_rows, write_values,
 
 YEAR = config.CFB_YEAR or datetime.now().year
 BASE = "https://api.collegefootballdata.com"
-WORKBOOK = "College Football.xlsx"
+WORKBOOK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "College Football.xlsx")
 SHEET = "CFB"
 
 # sheet name -> the name CollegeFootballData uses (only where they differ)
