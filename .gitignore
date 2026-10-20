@@ -7,3 +7,10 @@ __pycache__/
 
 # Excel lock files
 ~$*.xlsx
+
+# Runtime state written by the data updaters
+.last_update
+.plays_cache.json
+
+# Windows / PowerShell caches
+Microsoft/

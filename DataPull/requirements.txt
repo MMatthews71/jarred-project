@@ -1,0 +1,4 @@
+requests
+openpyxl
+# optional - only needed if you fill in a KenPom login in config.py:
+# kenpompy
