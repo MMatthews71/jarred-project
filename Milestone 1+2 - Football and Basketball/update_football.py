@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-update_football.py  -  fill 'College Football.xlsx' with the latest numbers
-===========================================================================
+update_football.py  -  fill the CFB tab of 'College Sports.xlsx' with the latest numbers
+========================================================================================
 
 Run this (double-click "Update Football.bat", or: python update_football.py)
 whenever you want fresh data.  It never runs on its own.
@@ -32,7 +32,7 @@ from common import (requests, TeamMatcher, open_sheet, sheet_rows, write_values,
 
 YEAR = config.CFB_YEAR or datetime.now().year
 BASE = "https://api.collegefootballdata.com"
-WORKBOOK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "College Football.xlsx")
+WORKBOOK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "College Sports.xlsx")
 SHEET = "CFB"
 
 # sheet name -> the name CollegeFootballData uses (only where they differ)
