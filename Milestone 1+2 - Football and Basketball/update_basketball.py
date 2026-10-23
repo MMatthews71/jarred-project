@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-update_basketball.py  -  fill 'College Basketball.xlsx' with the latest numbers
-===============================================================================
+update_basketball.py  -  fill the CBB tab of 'College Sports.xlsx' with the latest numbers
+==========================================================================================
 
 Run this (double-click "Update Basketball.bat", or: python update_basketball.py)
 whenever you want fresh data.  It never runs on its own.
@@ -28,7 +28,14 @@ publish the new season's numbers; this updater automatically picks up the new
 figures as soon as ESPN posts them.
 """
 
+import os
+import sys
 from datetime import datetime
+
+# The embedded Python that setup_python.bat installs uses a ._pth file, which
+# stops Python from adding this script's own folder to the import path. Add it
+# back so the local config.py / common.py next to this file are found.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import config
 from common import (requests, TeamMatcher, open_sheet, sheet_rows, write_values,
@@ -36,7 +43,7 @@ from common import (requests, TeamMatcher, open_sheet, sheet_rows, write_values,
 from openpyxl.utils import column_index_from_string
 
 SEASON = config.CBB_SEASON or (datetime.now().year + (1 if datetime.now().month >= 5 else 0))
-WORKBOOK = "College Basketball.xlsx"
+WORKBOOK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "College Sports.xlsx")
 SHEET = "CBB"
 _UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
        "(KHTML, like Gecko) Chrome/129.0 Safari/537.36")
