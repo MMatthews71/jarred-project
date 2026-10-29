@@ -30,7 +30,9 @@ import config
 from common import (requests, TeamMatcher, open_sheet, sheet_rows, write_values,
                     save_sheet, report, http_get, parse_tables, norm)
 
-YEAR = config.CFB_YEAR or datetime.now().year
+# January/February still belong to the season that kicked off last year
+# (bowls and the playoff), so use last year's season then.
+YEAR = config.CFB_YEAR or (datetime.now().year - (1 if datetime.now().month <= 2 else 0))
 BASE = "https://api.collegefootballdata.com"
 WORKBOOK = os.path.join(os.path.dirname(os.path.abspath(__file__)), "College Sports.xlsx")
 SHEET = "CFB"
@@ -211,6 +213,8 @@ def main():
         control, week = pull_control()
         if control is None:
             pass                                   # unreachable - leave as-is
+        elif not control:
+            print("  ! no Control Ratings found on mcillecesports.com - column S left unchanged.")
         else:
             cm = TeamMatcher(rows.keys(), alias=MCILLE_ALIAS)
             for t in control:

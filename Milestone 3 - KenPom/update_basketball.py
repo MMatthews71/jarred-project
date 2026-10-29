@@ -258,13 +258,19 @@ def main():
 
     # ---- ESPN ----
     print("  ESPN BPI / SOR / SOS ...")
-    espn = pull_espn()
+    try:
+        espn = pull_espn()
+    except Exception as e:
+        print(f"  ! ESPN unavailable ({e}) - columns D/E/G/I/L left unchanged.")
+        espn = {}
     em = TeamMatcher(rows.keys(), alias=CBB_ESPN_ALIAS)
     for _id, rec in espn.items():
         tm = rec["team"]
         em.add(_id, [tm.get("shortDisplayName"), tm.get("nickname"), tm.get("displayName")],
                abbr=tm.get("abbreviation"), payload=rec)
     emap, emiss = em.sheet_to_source()
+    if not espn:
+        emiss = []                    # already reported above
     for letter, field, nd in [("D", "sor", 0), ("E", "sos", 0), ("G", "bpi", 2),
                               ("I", "bpi_off", 2), ("L", "bpi_def", 2)]:
         vals = {t: d.get(field) for t, d in emap.items()}
