@@ -2,7 +2,8 @@
 REM ============================================================
 REM  College Basketball - data updater
 REM  Double-click this to pull the latest numbers into
-REM  "College Basketball.xlsx".  It only runs when you click it.
+REM  the CBB tab of "College Sports.xlsx".  It only runs when
+REM  you click it.
 REM  Close the workbook in Excel first.
 REM ============================================================
 

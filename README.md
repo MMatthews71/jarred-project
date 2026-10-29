@@ -30,8 +30,11 @@ and a `CBB` tab. `Update Football.bat` and `Update Basketball.bat` each refresh
 their own tab; `Update All.bat` runs both. See the folder's `README.txt`.
 
 ### Milestone 3 - KenPom/
-The basketball tool from Milestone 2 with the four KenPom columns filled in
-automatically (requires a KenPom login — see `Milestone 3 - KenPom/README.txt`).
+The Milestone 1+2 tool (same `College Sports.xlsx`) with the four KenPom
+basketball columns (SOS, Ovr, ORtg, DRtg) filled in automatically from the
+free kenpom.com home page — no subscription or login. If kenpom.com can't be
+read, it falls back to a copy of that page saved into the folder from a
+browser. See `Milestone 3 - KenPom/README.txt`.
 
 ## Notes
 

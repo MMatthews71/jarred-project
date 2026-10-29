@@ -15,7 +15,7 @@ REM  To start over, delete the "python" folder.
 REM ============================================================
 
 set "PYVER=3.12.10"
-set "PKGS=requests openpyxl tzdata kenpompy"
+set "PKGS=requests openpyxl tzdata"
 set "PYDIR=%~dp0python"
 set "PY="
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-update_basketball.py  -  fill 'College Basketball.xlsx' with the latest numbers
-===============================================================================
+update_basketball.py  -  fill the CBB tab of 'College Sports.xlsx' with the latest numbers
+==========================================================================================
 
 Run this (double-click "Update Basketball.bat", or: python update_basketball.py)
 whenever you want fresh data.  It never runs on its own.
@@ -13,30 +13,41 @@ Columns and sources:
   C  Roster (Barttorvik Talent) ....... Barttorvik
   D  ESPN SOR .......................... ESPN
   E  ESPN SOS .......................... ESPN
-  F  KenPom SOS ........................ KenPom  (manual unless login set - see config.py)
+  F  KenPom SOS (SOS NetRtg) .......... KenPom  (free home page - no login)
   G  ESPN BPI .......................... ESPN
-  H  KenPom Ovr Rating ................. KenPom  (manual unless login set)
+  H  KenPom Ovr Rating (NetRtg) ........ KenPom
   I  ESPN BPI Off ...................... ESPN
-  J  KenPom Offense (ORtg) ............. KenPom  (manual unless login set)
+  J  KenPom Offense (ORtg) ............. KenPom
   K  Barttorvik Off (ADJOE) ............ Barttorvik
   L  ESPN BPI Def ...................... ESPN
-  M  KenPom Defense (DRtg) ............. KenPom  (manual unless login set)
+  M  KenPom Defense (DRtg) ............. KenPom
   N  Barttorvik Def (ADJDE) ............ Barttorvik
 
 Note: in the pre-season ESPN still serves last season's final BPI until they
 publish the new season's numbers; this updater automatically picks up the new
-figures as soon as ESPN posts them.
+figures as soon as ESPN posts them.  KenPom's home page likewise shows last
+season's final ratings until KenPom posts the new season's.
 """
 
+import glob
+import os
+import re
+import sys
 from datetime import datetime
+
+# The embedded Python that setup_python.bat installs uses a ._pth file, which
+# stops Python from adding this script's own folder to the import path. Add it
+# back so the local config.py / common.py next to this file are found.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import config
 from common import (requests, TeamMatcher, open_sheet, sheet_rows, write_values,
-                    save_sheet, report, barttorvik_get, parse_tables)
+                    save_sheet, report, barttorvik_get, parse_tables, http_get, norm)
 from openpyxl.utils import column_index_from_string
 
 SEASON = config.CBB_SEASON or (datetime.now().year + (1 if datetime.now().month >= 5 else 0))
-WORKBOOK = "College Basketball.xlsx"
+HERE = os.path.dirname(os.path.abspath(__file__))
+WORKBOOK = os.path.join(HERE, "College Sports.xlsx")
 SHEET = "CBB"
 _UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
        "(KHTML, like Gecko) Chrome/129.0 Safari/537.36")
@@ -78,6 +89,17 @@ CBB_BT_ALIAS = {
     "UTRGV": "UT Rio Grande Valley", "VA Tech": "Virginia Tech",
     "WKU": "Western Kentucky", "Wash St.": "Washington St.",
     "Western Mich": "Western Michigan",
+}
+
+# sheet name -> the name(s) KenPom uses.  KenPom spells teams almost exactly
+# like Barttorvik, so this starts from that list; a tuple lists spellings to
+# try in order.  ("X St." vs plain "X", e.g. McNeese, is handled automatically.)
+CBB_KP_ALIAS = {
+    **CBB_BT_ALIAS,
+    "Cal St. Northridge": ("CSUN", "Cal St. Northridge"),
+    "SIU Edwardsville": ("SIUE",),
+    "UMKC": ("Kansas City",),
+    "UMass": ("Massachusetts",),
 }
 
 
@@ -137,27 +159,95 @@ def pull_barttorvik():
     return out
 
 
+def parse_kenpom(html):
+    """{kp_team: {'sos':,'ovr':,'ortg':,'drtg':}} from the kenpom.com ratings table.
+
+    A data row is: Rk, Team, Conf, W-L, NetRtg, ORtg, rank, DRtg, rank, AdjT,
+    rank, Luck, rank, SOS NetRtg, rank, SOS ORtg, rank, SOS DRtg, rank, ...
+    Every row is checked (NetRtg = ORtg - DRtg, and the same for SOS), so if
+    KenPom ever moves its columns nothing wrong gets written.
+    """
+    out = {}
+    for tbl in parse_tables(html):
+        for row in tbl:
+            if len(row) < 18 or not row[0].strip().isdigit():
+                continue                      # header / non-data rows
+            team = re.sub(r"\s*\d+$", "", row[1]).strip()   # drop a tournament seed
+            net, ortg, drtg, sos, opp_o, opp_d = (_num(row[i]) for i in (4, 5, 7, 13, 15, 17))
+            if not team or None in (net, ortg, drtg, sos, opp_o, opp_d):
+                continue
+            if abs(net - (ortg - drtg)) > 0.15 or abs(sos - (opp_o - opp_d)) > 0.15:
+                continue
+            out[team] = {"sos": sos, "ovr": net, "ortg": ortg, "drtg": drtg}
+    return out
+
+
+def _saved_kenpom_page():
+    """Newest copy of the KenPom home page saved into this folder, or None."""
+    named = os.path.join(HERE, config.KENPOM_SAVED_PAGE)
+    pages = [named] if os.path.exists(named) else []
+    pages += [p for p in glob.glob(os.path.join(HERE, "*.htm*"))
+              if re.search(r"kenpom|pomeroy", os.path.basename(p), re.I)]
+    return max(pages, key=os.path.getmtime) if pages else None
+
+
 def pull_kenpom():
-    """{kp_team: {'sos':,'ovr':,'ortg':,'drtg':}} or {} if no login/available."""
-    if not (config.KENPOM_EMAIL and config.KENPOM_PASSWORD):
-        return {}, "manual"
+    """({kp_team: stats}, where it came from) - or ({}, why not)."""
     try:
-        import kenpompy.utils as kpu
-        import kenpompy.summary as kps
-        from kenpompy.misc import get_pomeroy_ratings
-        browser = kpu.login(config.KENPOM_EMAIL, config.KENPOM_PASSWORD)
-        df = get_pomeroy_ratings(browser, season=str(SEASON))
-        out = {}
-        for _, r in df.iterrows():
-            out[str(r.get("Team", "")).strip()] = {
-                "ovr": _num(r.get("AdjEM")),
-                "ortg": _num(r.get("AdjO")),
-                "drtg": _num(r.get("AdjD")),
-                "sos": _num(r.get("AdjEM.1")),     # SOS AdjEM column
-            }
-        return out, "ok"
+        data = parse_kenpom(http_get("https://kenpom.com/"))
+        if len(data) >= 300:
+            return data, "kenpom.com"
+        why = "kenpom.com did not return its ratings table"
     except Exception as e:
-        return {}, f"error: {e}"
+        why = f"could not read kenpom.com ({e})"
+
+    saved = _saved_kenpom_page()
+    if not saved:
+        return {}, why
+    with open(saved, encoding="utf-8", errors="replace") as f:
+        data = parse_kenpom(f.read())
+    if not data:
+        return {}, (f"{why}; and no ratings table found in {os.path.basename(saved)} - "
+                    f"save it again as 'Webpage, Complete'")
+    when = datetime.fromtimestamp(os.path.getmtime(saved))
+    age = (datetime.now() - when).days
+    note = f" - {age} days old, save a fresh copy" if age >= 7 else ""
+    print(f"  ({why}; using your saved page instead)")
+    return data, f"your saved page {os.path.basename(saved)}, saved {when:%b %d}{note}"
+
+
+def match_kenpom(sheet_names, kp):
+    """(mapping, unmatched) like TeamMatcher.sheet_to_source(), using CBB_KP_ALIAS."""
+    exact = {norm(n): n for n in kp}
+    loose = {}                                # name without a trailing "St."
+    for n in kp:
+        loose.setdefault(re.sub(r" state$", "", norm(n)), []).append(n)
+
+    found = {}
+    for team in sheet_names:
+        alias = CBB_KP_ALIAS.get(team, ())
+        tries = ((alias,) if isinstance(alias, str) else tuple(alias)) + (team,)
+        hit = next((exact[norm(t)] for t in tries if norm(t) in exact), None)
+        if hit is None:
+            for t in tries:
+                cands = loose.get(re.sub(r" state$", "", norm(t)), [])
+                if len(cands) == 1:
+                    hit = cands[0]
+                    break
+        found[team] = hit
+
+    # never let one KenPom team fill two rows on the sheet
+    claims = {}
+    for team, hit in found.items():
+        if hit is not None:
+            claims.setdefault(hit, []).append(team)
+    mapping, unmatched = {}, []
+    for team, hit in found.items():
+        if hit is None or len(claims[hit]) > 1:
+            unmatched.append(team)
+        else:
+            mapping[team] = kp[hit]
+    return mapping, unmatched
 
 
 def main():
@@ -198,28 +288,29 @@ def main():
     else:
         bmiss = []
 
-    # ---- KenPom (optional) ----
-    kp, status = pull_kenpom()
-    if status == "manual":
-        print("  KenPom: columns F/H/J/M left for manual entry (no login in config.py).")
-        kmiss = []
-    elif kp:
-        km = TeamMatcher(rows.keys())
-        for name, rec in kp.items():
-            km.add(name, [name], payload=rec)
-        kmap, kmiss = km.sheet_to_source()
-        for letter, field, nd in [("F", "sos", 2), ("H", "ovr", 2), ("J", "ortg", 1), ("M", "drtg", 1)]:
-            vals = {t: d.get(field) for t, d in kmap.items()}
-            total += write_values(ws, rows, column_index_from_string(letter), vals, nd)
-        print(f"  KenPom: pulled for {len(kmap)} teams.")
+    # ---- KenPom (free home page) ----
+    kmiss = []
+    if not config.AUTO_KENPOM:
+        print("  KenPom: AUTO_KENPOM is off - columns F/H/J/M left as you typed them.")
     else:
-        print(f"  KenPom: not updated ({status}) - columns F/H/J/M left as-is.")
-        kmiss = []
+        print("  KenPom SOS / Ovr / ORtg / DRtg ...")
+        kp, source = pull_kenpom()
+        if kp:
+            kmap, kmiss = match_kenpom(rows.keys(), kp)
+            for letter, field, nd in [("F", "sos", 2), ("H", "ovr", 2), ("J", "ortg", 1), ("M", "drtg", 1)]:
+                vals = {t: d.get(field) for t, d in kmap.items()}
+                total += write_values(ws, rows, column_index_from_string(letter), vals, nd)
+            print(f"  KenPom: {len(kmap)} teams, from {source}.")
+        else:
+            print(f"  ! KenPom not updated ({source}) - columns F/H/J/M left unchanged.")
+            print("    To fill them anyway, save the kenpom.com home page into this folder")
+            print("    (see README.txt) and run the updater again.")
 
     save_sheet(wb, WORKBOOK)
     print(f"\nDone.  Wrote {total} stat values across {len(rows)} teams.")
     report("ESPN", emiss)
     report("Barttorvik", bmiss)
+    report("KenPom", kmiss)
 
 
 if __name__ == "__main__":
