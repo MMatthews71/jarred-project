@@ -1,8 +1,7 @@
 # Jarred Project
 
 A single repo holding the College Football betting model and the data-pull
-tools for football and basketball. Each piece keeps its own spreadsheet — the
-Excel files are intentionally separate, not merged.
+tools for football and basketball.
 
 ## What's here
 
@@ -24,15 +23,18 @@ The College Football predictive betting model.
 Combined one-click updaters for both spreadsheets:
 `College Football.xlsx` and `College Basketball.xlsx`. See `DataPull/README.txt`.
 
-### Milestone 1 - Football/
-Standalone football data-pull tool and spreadsheet (`College Football.xlsx`).
-
-### Milestone 2 - Basketball/
-Standalone basketball data-pull tool and spreadsheet (`College Basketball.xlsx`).
+### Milestone 1+2 - Football and Basketball/
+The football (Milestone 1) and basketball (Milestone 2) data-pull tools in one
+folder, sharing a single spreadsheet, `College Sports.xlsx`, with a `CFB` tab
+and a `CBB` tab. `Update Football.bat` and `Update Basketball.bat` each refresh
+their own tab; `Update All.bat` runs both. See the folder's `README.txt`.
 
 ### Milestone 3 - KenPom/
-The basketball tool from Milestone 2 with the four KenPom columns filled in
-automatically (requires a KenPom login — see `Milestone 3 - KenPom/README.txt`).
+The Milestone 1+2 tool (same `College Sports.xlsx`) with the four KenPom
+basketball columns (SOS, Ovr, ORtg, DRtg) filled in automatically from the
+free kenpom.com home page — no subscription or login. If kenpom.com can't be
+read, it falls back to a copy of that page saved into the folder from a
+browser. See `Milestone 3 - KenPom/README.txt`.
 
 ## Notes
 

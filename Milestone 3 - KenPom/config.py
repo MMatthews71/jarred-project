@@ -30,11 +30,13 @@ AUTO_CONTROL = True
 CONTROL_BYE_VALUE = 25
 
 # ---------------------------------------------------------------------------
-# KenPom (basketball columns F, H, J, M).  KenPom has NO public API and needs
-# a paid login, so these four columns are left for you to type in by hand by
-# default.  If you have a KenPom subscription and want them pulled too, put
-# your login here AND install the helper once:   pip install kenpompy
-# Leaving these blank keeps those columns manual (the updater won't touch them).
+# KenPom (basketball columns F, H, J, M) - source: the FREE kenpom.com home
+# page (no subscription or login needed).
+#   AUTO_KENPOM = True   -> fill SOS / Ovr / ORtg / DRtg each run.  If the
+#                           site can't be read, the updater uses a copy of the
+#                           page you saved yourself (see README.txt), and if
+#                           there isn't one either, leaves the columns as-is.
+#   AUTO_KENPOM = False  -> leave those four columns exactly as you typed them.
 # ---------------------------------------------------------------------------
-KENPOM_EMAIL = ""
-KENPOM_PASSWORD = ""
+AUTO_KENPOM = True
+KENPOM_SAVED_PAGE = "kenpom.html"     # the saved-page fallback, in this folder
