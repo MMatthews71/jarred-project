@@ -100,6 +100,7 @@ CBB_KP_ALIAS = {
     "Cal St. Northridge": ("CSUN", "Cal St. Northridge"),
     "SIU Edwardsville": ("SIUE",),
     "UMKC": ("Kansas City",),
+    "New Orleans": ("LSU New Orleans", "New Orleans"),
     "UMass": ("Massachusetts",),
 }
 
