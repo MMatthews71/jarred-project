@@ -29,6 +29,7 @@ figures as soon as ESPN posts them.  KenPom's home page likewise shows last
 season's final ratings until KenPom posts the new season's.
 """
 
+import difflib
 import glob
 import os
 import re
@@ -65,7 +66,7 @@ CBB_ESPN_ALIAS = {
     "Eastern Mich": "EMU", "Eastern Wash": "EWU", "Grambling St.": "GRAM",
     "McNeese St.": "MCN", "MD Eastern Shore": "UMES", "Nicholls St.": "NICH",
     "Sam Houston St.": "SHSU", "San Jose St.": "SJSU", "Western Mich": "WMU",
-    "West Florida": "__NONE__",   # not carried by ESPN
+    # West Florida: matched automatically once ESPN starts carrying them
 }
 
 # sheet name -> the name Barttorvik uses, only where they differ.
@@ -172,7 +173,8 @@ def parse_kenpom(html):
         for row in tbl:
             if len(row) < 18 or not row[0].strip().isdigit():
                 continue                      # header / non-data rows
-            team = re.sub(r"\s*\d+$", "", row[1]).strip()   # drop a tournament seed
+            # drop a tournament seed or any marker symbol after the name
+            team = re.sub(r"[^A-Za-z.')]+$", "", row[1]).strip()
             net, ortg, drtg, sos, opp_o, opp_d = (_num(row[i]) for i in (4, 5, 7, 13, 15, 17))
             if not team or None in (net, ortg, drtg, sos, opp_o, opp_d):
                 continue
@@ -250,6 +252,15 @@ def match_kenpom(sheet_names, kp):
     return mapping, unmatched
 
 
+def _closest_kenpom(team, kp):
+    """'Team  (closest on KenPom: ...)' so a missing match is a one-line fix."""
+    names = {norm(n): n for n in kp}
+    near = difflib.get_close_matches(norm(team), names, n=2, cutoff=0.6)
+    if not near:
+        return f"{team}  (not listed on KenPom)"
+    return f"{team}  (closest on KenPom: {', '.join(names[n] for n in near)})"
+
+
 def main():
     print(f"College Basketball - pulling {SEASON} data ...")
     wb, ws = open_sheet(WORKBOOK, SHEET)
@@ -316,7 +327,7 @@ def main():
     print(f"\nDone.  Wrote {total} stat values across {len(rows)} teams.")
     report("ESPN", emiss)
     report("Barttorvik", bmiss)
-    report("KenPom", kmiss)
+    report("KenPom", [_closest_kenpom(t, kp) for t in kmiss])
 
 
 if __name__ == "__main__":

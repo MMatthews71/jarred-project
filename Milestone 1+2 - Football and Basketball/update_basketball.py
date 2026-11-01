@@ -61,7 +61,7 @@ CBB_ESPN_ALIAS = {
     "Eastern Mich": "EMU", "Eastern Wash": "EWU", "Grambling St.": "GRAM",
     "McNeese St.": "MCN", "MD Eastern Shore": "UMES", "Nicholls St.": "NICH",
     "Sam Houston St.": "SHSU", "San Jose St.": "SJSU", "Western Mich": "WMU",
-    "West Florida": "__NONE__",   # not carried by ESPN
+    # West Florida: matched automatically once ESPN starts carrying them
 }
 
 # sheet name -> the name Barttorvik uses, only where they differ.
