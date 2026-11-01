@@ -14,3 +14,9 @@ __pycache__/
 
 # Windows / PowerShell caches
 Microsoft/
+
+# KenPom home page saved by hand for the Milestone 3 fallback
+*Pomeroy*.htm*
+*Pomeroy*_files/
+kenpom*.htm*
+kenpom*_files/
