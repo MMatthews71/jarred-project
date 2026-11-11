@@ -161,6 +161,37 @@ def pull_barttorvik():
     return out
 
 
+# KenPom rows that looked like a team but failed the NetRtg check, by team
+# name - printed at the end for any sheet team that came back blank.
+KP_SKIPPED = {}
+
+
+def _kp_ratings(nums):
+    """(net, ortg, drtg, sos, opp_o, opp_d) from one row's numbers, or None.
+
+    First tries KenPom's normal column positions.  If a row has an extra or
+    missing cell, it then looks for the same pattern anywhere in the row:
+    NetRtg, ORtg, (rank), DRtg ... SOS NetRtg, (rank), SOS ORtg, (rank), SOS DRtg
+    - accepted only where NetRtg = ORtg - DRtg holds, so nothing wrong is written.
+    """
+    def ok(net, o, d, lo, hi):
+        return (None not in (net, o, d) and lo <= o <= hi and lo <= d <= hi
+                and abs(net - (o - d)) <= 0.15)
+
+    def at(i):
+        return nums[i] if 0 <= i < len(nums) else None
+
+    if ok(at(4), at(5), at(7), 60, 150) and ok(at(13), at(15), at(17), 60, 150):
+        return at(4), at(5), at(7), at(13), at(15), at(17)
+    for i in range(3, len(nums)):
+        if not ok(at(i), at(i + 1), at(i + 3), 60, 150):
+            continue
+        for s in range(i + 4, len(nums)):
+            if ok(at(s), at(s + 2), at(s + 4), 60, 150):
+                return at(i), at(i + 1), at(i + 3), at(s), at(s + 2), at(s + 4)
+    return None
+
+
 def parse_kenpom(html):
     """{kp_team: {'sos':,'ovr':,'ortg':,'drtg':}} from the kenpom.com ratings table.
 
@@ -170,18 +201,23 @@ def parse_kenpom(html):
     KenPom ever moves its columns nothing wrong gets written.
     """
     out = {}
+    KP_SKIPPED.clear()
     for tbl in parse_tables(html):
         for row in tbl:
-            if len(row) < 18 or not row[0].strip().isdigit():
+            if len(row) < 2 or not row[0].strip().isdigit():
                 continue                      # header / non-data rows
             # drop a tournament seed or any marker symbol after the name
             team = re.sub(r"[^A-Za-z.')]+$", "", row[1]).strip()
-            net, ortg, drtg, sos, opp_o, opp_d = (_num(row[i]) for i in (4, 5, 7, 13, 15, 17))
-            if not team or None in (net, ortg, drtg, sos, opp_o, opp_d):
+            if not team:
                 continue
-            if abs(net - (ortg - drtg)) > 0.15 or abs(sos - (opp_o - opp_d)) > 0.15:
+            vals = _kp_ratings([_num(c) for c in row])
+            if vals is None:
+                KP_SKIPPED[team] = row
                 continue
+            net, ortg, drtg, sos, opp_o, opp_d = vals
             out[team] = {"sos": sos, "ovr": net, "ortg": ortg, "drtg": drtg}
+    for team in out:
+        KP_SKIPPED.pop(team, None)
     return out
 
 
@@ -226,18 +262,25 @@ def match_kenpom(sheet_names, kp):
     for n in kp:
         loose.setdefault(re.sub(r" state$", "", norm(n)), []).append(n)
 
-    found = {}
+    found, guessed = {}, {}
     for team in sheet_names:
         alias = CBB_KP_ALIAS.get(team, ())
         tries = ((alias,) if isinstance(alias, str) else tuple(alias)) + (team,)
-        hit = next((exact[norm(t)] for t in tries if norm(t) in exact), None)
-        if hit is None:
+        found[team] = next((exact[norm(t)] for t in tries if norm(t) in exact), None)
+        if found[team] is None:
             for t in tries:
                 cands = loose.get(re.sub(r" state$", "", norm(t)), [])
                 if len(cands) == 1:
-                    hit = cands[0]
+                    guessed[team] = cands[0]
                     break
-        found[team] = hit
+
+    # a "St."-dropped guess never takes a KenPom team that another sheet row
+    # already matched exactly (e.g. if "Missouri St." is missing from KenPom,
+    # it must not steal "Missouri" from the Mizzou row)
+    taken = {hit for hit in found.values() if hit is not None}
+    for team, hit in guessed.items():
+        if hit not in taken:
+            found[team] = hit
 
     # never let one KenPom team fill two rows on the sheet
     claims = {}
@@ -255,6 +298,13 @@ def match_kenpom(sheet_names, kp):
 
 def _closest_kenpom(team, kp):
     """'Team  (closest on KenPom: ...)' so a missing match is a one-line fix."""
+    alias = CBB_KP_ALIAS.get(team, ())
+    tries = ((alias,) if isinstance(alias, str) else tuple(alias)) + (team,)
+    for t in tries:
+        for name, row in KP_SKIPPED.items():
+            if norm(name) == norm(t):
+                return (f"{team}  (on KenPom, but its row didn't add up so it was skipped:\n"
+                        f"          {' | '.join(row)})")
     names = {norm(n): n for n in kp}
     near = difflib.get_close_matches(norm(team), names, n=2, cutoff=0.6)
     if not near:
