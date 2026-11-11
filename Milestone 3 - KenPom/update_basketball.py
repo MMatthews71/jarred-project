@@ -181,8 +181,13 @@ def _kp_ratings(nums):
     def at(i):
         return nums[i] if 0 <= i < len(nums) else None
 
-    if ok(at(4), at(5), at(7), 60, 150) and ok(at(13), at(15), at(17), 60, 150):
-        return at(4), at(5), at(7), at(13), at(15), at(17)
+    if ok(at(4), at(5), at(7), 60, 150):
+        if ok(at(13), at(15), at(17), 60, 150):
+            return at(4), at(5), at(7), at(13), at(15), at(17)
+        if (at(13), at(15), at(17)) == (-99.0, 0.0, 200.0):
+            # KenPom has no schedule strength for this team yet - keep the
+            # three ratings, leave SOS alone
+            return at(4), at(5), at(7), None, None, None
     for i in range(3, len(nums)):
         if not ok(at(i), at(i + 1), at(i + 3), 60, 150):
             continue
@@ -369,6 +374,10 @@ def main():
                 vals = {t: d.get(field) for t, d in kmap.items()}
                 total += write_values(ws, rows, column_index_from_string(letter), vals, nd)
             print(f"  KenPom: {len(kmap)} teams, from {source}.")
+            no_sos = sorted(t for t, d in kmap.items() if d.get("sos") is None)
+            if no_sos:
+                print(f"  KenPom has no SOS yet for {len(no_sos)} team(s) - their SOS (column F)")
+                print(f"  was left as it was:  {', '.join(no_sos)}")
         else:
             print(f"  ! KenPom not updated ({source}) - columns F/H/J/M left unchanged.")
             print("    To fill them anyway, save the kenpom.com home page into this folder")
