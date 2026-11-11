@@ -192,9 +192,22 @@ def barttorvik_get(url):
     return r.text
 
 
-def http_get(url):
-    """Plain GET with a browser user-agent; returns page text."""
-    r = requests.get(url, headers={"User-Agent": _UA}, timeout=60)
+def http_get(url, tries=3):
+    """Plain GET with a browser user-agent; returns page text.
+
+    If the site says "too many requests" (429) - e.g. right after another
+    run - wait a little and try again before giving up."""
+    import time
+    for attempt in range(1, tries + 1):
+        r = requests.get(url, headers={"User-Agent": _UA}, timeout=60)
+        if r.status_code != 429 or attempt == tries:
+            break
+        try:
+            wait = min(int(r.headers.get("Retry-After", "")), 60)
+        except ValueError:
+            wait = 15 * attempt
+        print(f"  (site busy - waiting {wait}s and trying again ...)")
+        time.sleep(wait)
     r.raise_for_status()
     return r.text
 
